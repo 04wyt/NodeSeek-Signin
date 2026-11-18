@@ -297,7 +297,8 @@ def get_signin_stats(ns_cookie, days=30):
         
         while page <= 20:  # 最多查询20页，防止无限循环
             url = f"https://www.nodeseek.com/api/account/credit/page-{page}"
-            response = requests.get(url, headers=headers, impersonate="chrome110")            data = response.json()
+            response = requests.get(url, headers=headers, impersonate="chrome110")
+            data = response.json()
             
             if not data.get("success") or not data.get("data"):
                 break
