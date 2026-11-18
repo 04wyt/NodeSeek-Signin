@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import sys
 import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -296,8 +297,7 @@ def get_signin_stats(ns_cookie, days=30):
         
         while page <= 20:  # 最多查询20页，防止无限循环
             url = f"https://www.nodeseek.com/api/account/credit/page-{page}"
-            response = requests.get(url, headers=headers, impersonate="chrome110")
-            data = response.json()
+            response = requests.get(url, headers=headers, impersonate="chrome110")            data = response.json()
             
             if not data.get("success") or not data.get("data"):
                 break
@@ -448,7 +448,17 @@ if __name__ == "__main__":
         cookie_list.append("")
     
     cookies_updated = False
-    
+    overall_success = True
+
+    if max_count == 0:
+        overall_success = False
+        print("未配置任何账号或Cookie")
+        if hadsend:
+            try:
+                send("NodeSeek 签到失败", "未配置任何账号或Cookie，请检查 GitHub Secrets / Variables。")
+            except Exception as e:
+                print(f"发送通知失败: {e}")
+
     for i in range(max_count):
         account_index = i + 1
         account = accounts[i]
@@ -514,16 +524,29 @@ if __name__ == "__main__":
                             except Exception as e:
                                 print(f"发送通知失败: {e}")
                     else:
+                        overall_success = False
                         print(f"账号 {display_user} 重新签到仍然失败: {msg}")
+                        if hadsend:
+                            try:
+                                send("NodeSeek 签到失败", f"账号 {display_user}：重新登录后签到仍然失败。\n原因：{msg}")
+                            except Exception as e:
+                                print(f"发送通知失败: {e}")
                 else:
+                    overall_success = False
                     print(f"账号 {display_user} 登录失败，无法获取新Cookie")
                     if hadsend:
                         try:
-                            send("NodeSeek 登录失败", f"账号 {display_user} 登录失败")
+                            send("NodeSeek 登录失败", f"账号 {display_user} 登录失败，无法获取新Cookie。原签到错误：{msg}")
                         except Exception as e:
                             print(f"发送通知失败: {e}")
             else:
+                overall_success = False
                 print(f"账号 {display_user} 无法重新登录: 未配置用户名或密码")
+                if hadsend:
+                    try:
+                        send("NodeSeek 签到失败：Cookie失效", f"账号 {display_user} 的Cookie无效，且未配置用户名/密码，无法自动重新登录。\n错误：{msg}")
+                    except Exception as e:
+                        print(f"发送通知失败: {e}")
     
     if cookies_updated and cookie_list:
         print("\n==== 处理完毕，保存更新后的Cookie ====")
@@ -532,4 +555,11 @@ if __name__ == "__main__":
             save_cookie("NS_COOKIE", all_cookies_new)
             print("所有Cookie已成功保存")
         except Exception as e:
+            overall_success = False
             print(f"保存Cookie变量异常: {e}")
+
+    if not overall_success:
+        print("\n==== 签到任务存在失败，返回非零退出码 ====")
+        sys.exit(1)
+
+    print("\n==== 所有账号签到流程完成 ====")
